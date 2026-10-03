@@ -108,6 +108,15 @@ public:
 	{
 	}
 
+	// Seek used while the user drags the scroll bar.
+	// Returns true if the new position is only approximate (nearest preceding keyframe),
+	// in this case the caller must call SetPosFast(Pos) when the drag is finished.
+	virtual bool SetPosPreview(s64 Pos)
+	{
+		SetPosFast(Pos);
+		return false;
+	}
+
 	virtual void SetImageGeted(bool ImageGeted)
 	{
 	}

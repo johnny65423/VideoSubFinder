@@ -530,6 +530,10 @@ bool FFMPEGVideo::OpenMovie(wxString csMovieName, void *pVideoWindow, int device
 		}
 		SaveToReportLog(wxT("FFMPEGVideo::OpenMovie(): avcodec_parameters_to_context passed\n"));
 
+		// libavcodec uses a single decoding thread by default, enable multithreaded software decoding
+		decoder_ctx->thread_count = 0; // auto
+		decoder_ctx->thread_type = FF_THREAD_FRAME | FF_THREAD_SLICE;
+
 		// init the video decoder
 		if ((ret = avcodec_open2(decoder_ctx, decoder, NULL)) < 0) {
 			wxString msg;
@@ -845,7 +849,11 @@ void FFMPEGVideo::SetPos(s64 Pos)
 		
 		s64 setPos, minPos, maxPos;
 		int num_tries, res;
-		int64_t min_ts, ts, max_ts;		
+		int64_t min_ts, ts, max_ts;
+
+		// m_dt_search grows when the target is not reachable (e.g. before the first keyframe),
+		// start every seek from the small window again, otherwise all next seeks decode up to 60 s of frames
+		m_dt_search = 1000;
 
 		num_tries = 0;
 		do
@@ -863,6 +871,7 @@ void FFMPEGVideo::SetPos(s64 Pos)
 
 
 				res = avformat_seek_file(input_ctx, video_stream, min_ts, ts, max_ts, AVSEEK_FLAG_FRAME);
+				avcodec_flush_buffers(decoder_ctx); // drop frames buffered before the seek (required with frame threading)
 				need_to_read_packet = true;
 				OneStep();
 				num_tries++;
@@ -922,6 +931,42 @@ void FFMPEGVideo::SetPos(double pos)
 void FFMPEGVideo::SetPosFast(s64 Pos)
 {
 	SetPos(Pos);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+
+// Shows the nearest keyframe at or before Pos: only one frame is decoded, so it is cheap enough to follow a dragged scroll bar
+bool FFMPEGVideo::SetPosPreview(s64 Pos)
+{
+	if (!input_ctx)
+	{
+		return false;
+	}
+
+	if (m_play_video)
+	{
+		Pause();
+	}
+
+	int64_t ts = std::max<int64_t>(0, av_rescale(Pos, video->time_base.den, video->time_base.num * 1000) + m_start_pts);
+
+	int res = avformat_seek_file(input_ctx, video_stream, INT64_MIN, ts, ts, 0);
+	if (res < 0)
+	{
+		// there is no keyframe before Pos (e.g. the stream starts with non-keyframes), seek to the first one after it
+		res = avformat_seek_file(input_ctx, video_stream, ts, ts, INT64_MAX, 0);
+	}
+
+	if (res < 0)
+	{
+		return false;
+	}
+
+	avcodec_flush_buffers(decoder_ctx);
+	need_to_read_packet = true;
+	OneStep();
+
+	return true;
 }
 
 /////////////////////////////////////////////////////////////////////////////

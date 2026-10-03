@@ -123,6 +123,7 @@ public:
 	void SetPos(s64 Pos);
 	void SetPos(double pos);
 	void SetPosFast(s64 Pos);
+	bool SetPosPreview(s64 Pos);
 
 	void SetImageGeted(bool ImageGeted);
 
