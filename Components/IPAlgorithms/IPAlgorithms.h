@@ -143,6 +143,7 @@ void BorderClear(simple_buffer<T> &Im, int dd, int w, int h);
 template <class T>
 void EasyBorderClear(simple_buffer<T> &Im, int w, int h);
 
+void GetImFFFinalize(simple_buffer<u8> &ImFF, simple_buffer<u8> &ImSF, simple_buffer<int> &LB, simple_buffer<int> &LE, int N, int w, int h);
 int GetTransformedImage(simple_buffer<u8> &ImBGR, simple_buffer<u8> &ImFF, simple_buffer<u8> &ImSF, simple_buffer<u8> &ImTF, simple_buffer<u8> &ImNE, simple_buffer<u8> &ImY, int w, int h, int W, int H, int min_x, int max_x);
 int FilterTransformedImage(simple_buffer<u8> &ImFF, simple_buffer<u8> &ImSF, simple_buffer<u8> &ImTF, simple_buffer<u8> &ImNE, simple_buffer<int> &LB, simple_buffer<int> &LE, int N, int w, int h, int W, int H, int min_x, int max_x, wxString iter_det);
 int FilterImage(simple_buffer<u8> &ImF, simple_buffer<u8> &ImNE, int w, int h, int W, int H, int min_x, int max_x, simple_buffer<int> &LB, simple_buffer<int> &LE, int N);

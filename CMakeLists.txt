@@ -54,6 +54,12 @@ add_subdirectory(Components/OCVVideo)
 add_subdirectory(Components/FFMPEGVideo)
 add_subdirectory(Interfaces/VideoSubFinderWXW)
 
+option(BUILD_GPU_PARITY_TESTS "Build the CPU/GPU parity tests (tests/gpu_parity)" OFF)
+if(BUILD_GPU_PARITY_TESTS)
+	enable_testing()
+	add_subdirectory(tests/gpu_parity)
+endif()
+
 install(TARGETS VideoSubFinderWXW DESTINATION VideoSubFinder)
 install(DIRECTORY Data/bitmaps/ DESTINATION VideoSubFinder/bitmaps)
 install(DIRECTORY Settings/Localization/ DESTINATION VideoSubFinder/settings FILES_MATCHING PATTERN "*.cfg")

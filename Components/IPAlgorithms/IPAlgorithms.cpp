@@ -1465,6 +1465,34 @@ void GetImCMOEWithThr2(simple_buffer<u16> &ImCMOE, simple_buffer<u16> &ImYMOE, s
 	}
 }
 
+// Last step of GetImFF(): ImSF = copy of ImFF and alignment of LB / LE to g_segh (changes the arrays of the caller).
+// Shared by the CPU path and the GPU path (gpu_transform::Run() delivers ImFF before this step).
+void GetImFFFinalize(simple_buffer<u8> &ImFF, simple_buffer<u8> &ImSF, simple_buffer<int> &LB, simple_buffer<int> &LE, int N, int w, int h)
+{
+	int val, k;
+	int segh;
+
+	ImSF.copy_data(ImFF, w * h);
+
+	segh = g_segh;
+	for (k = 0; k < N; k++)
+	{
+		val = LB[k] % segh;
+		LB[k] -= val;
+
+		val = LE[k] % segh;
+		if (val > 0) val = segh - val;
+		if (LE[k] + val < h) LE[k] += val;
+	}
+
+	if ((LE[N - 1] + g_segh) > h)
+	{
+		val = LE[N - 1] - (h - g_segh);
+		LE[N - 1] = h - g_segh;
+		ImSF.set_values(0, w * (LE[N - 1] + 1), w * val);
+	}
+}
+
 void GetImFF(simple_buffer<u8> &ImFF, simple_buffer<u8> &ImSF, simple_buffer<u8> &ImYFull, simple_buffer<u8> &ImUFull, simple_buffer<u8> &ImVFull, simple_buffer<int> &LB, simple_buffer<int> &LE, int N, int w,int h, int W, int H, double mthr)
 {	
 	simple_buffer<int> offsets(N), cnts(N), dhs(N);
@@ -1538,25 +1566,7 @@ void GetImFF(simple_buffer<u8> &ImFF, simple_buffer<u8> &ImSF, simple_buffer<u8>
 		}
 	}
 
-	ImSF.copy_data(ImFF, w * h);	
-
-	segh = g_segh;
-	for (k = 0; k < N; k++)
-	{
-		val = LB[k] % segh;
-		LB[k] -= val;
-
-		val = LE[k] % segh;
-		if (val > 0) val = segh - val;
-		if (LE[k] + val < h) LE[k] += val;
-	}
-
-	if ((LE[N - 1] + g_segh) > h)
-	{
-		val = LE[N - 1] - (h - g_segh);
-		LE[N - 1] = h - g_segh;
-		ImSF.set_values(0, w * (LE[N - 1] + 1), w * val);
-	}
+	GetImFFFinalize(ImFF, ImSF, LB, LE, N, w, h);
 }
 
 void GetImNE(simple_buffer<u8> &ImNE, simple_buffer<u8> &ImY, simple_buffer<u8> &ImU, simple_buffer<u8> &ImV, int w, int h)

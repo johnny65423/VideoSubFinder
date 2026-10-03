@@ -271,6 +271,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <CudaCompile Include="cuda_kernels.cu" />
+    <CudaCompile Include="gpu_transform.cu" />
     <CudaCompile Include="kmeans\cuda_kmeans.cu" />
   </ItemGroup>
   <ItemGroup>
