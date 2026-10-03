@@ -1,10 +1,11 @@
-// Framework of the GPU parity tests (milestone M1 of claudedocs/gpu_integration_design.md).
+// Framework of the GPU parity tests.
 //
 // Every check compares the GPU path with the CPU functions of the project, byte for byte.
-// At this stage the GPU path is a skeleton, so the tests cover the interface contract and the
-// refactored GetImFFFinalize(); the kernel comparisons (T1..T7 of the design) are added with M2/M3.
+// T1 (t1_kernels.cpp) covers every kernel and the pipeline stages; the end-to-end levels T4..T7 of
+// claudedocs/gpu_integration_design.md follow with M3. Usage: gpu_parity [--video <path to a test video>]
 #include "IPAlgorithms.h"
 #include "gpu_transform.h"
+#include "parity.h"
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -13,9 +14,8 @@
 // the report log of the application (DataTypes.h declares it, the main program defines it)
 wxString g_ReportFileName = wxT("./gpu_parity_report.log");
 
-static int g_checks = 0, g_failed = 0;
+int g_checks = 0, g_failed = 0;
 
-#define CHECK(cond) do { g_checks++; if (!(cond)) { g_failed++; printf("  FAILED %s:%d  %s\n", __FILE__, __LINE__, #cond); } } while (0)
 
 static void test_interface_contract()
 {
@@ -75,6 +75,7 @@ static void test_finalize()
 
 int main(int argc, char** argv)
 {
+	setvbuf(stdout, NULL, _IONBF, 0);   // keep the output when a test crashes
 	std::string video;
 	for (int i = 1; i + 1 < argc; i++)
 		if (strcmp(argv[i], "--video") == 0) video = argv[i + 1];
@@ -83,6 +84,7 @@ int main(int argc, char** argv)
 	printf("CUDA available: %s\n", gpu_transform::IsAvailable() ? "yes" : "no");
 	test_interface_contract();
 	test_finalize();
+	RunT1();
 
 	printf("\n%d checks, %d failed\n", g_checks, g_failed);
 	return g_failed ? 1 : 0;
