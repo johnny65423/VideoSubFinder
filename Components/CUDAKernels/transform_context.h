@@ -23,6 +23,9 @@ public:
 	cudaError_t Reserve(int w, int h);
 
 	cudaStream_t Stream() const { return st_; }
+	// completes when everything queued on the stream so far has finished. The wait sleeps (blocking sync) instead of spinning.
+	cudaError_t RecordDone();
+	cudaError_t WaitDone();
 	int Width() const { return w_; }
 	int Height() const { return h_; }
 
@@ -49,6 +52,11 @@ public:
 	// row0 / rows: first row and height of every band inside that image.
 	cudaError_t ComputeCmoe(int variant, int eh, int N, const int* row0, const int* rows, double mthr);
 
+	// ---- page locked host buffers (valid after Reserve): the caller's images are copied through them so that the transfers are real DMA
+	// and the thread can sleep while the device works. host_in has 3 n bytes, host_out has 3 n bytes (ff, ne, y one after the other).
+	uint8_t* host_in = nullptr;
+	uint8_t* host_out = nullptr;
+
 	// ---- device buffers (valid after Reserve), n = w * h
 	uint8_t *bgr = nullptr;                      // 3 n
 	uint8_t *y = nullptr, *u = nullptr, *v = nullptr;
@@ -65,6 +73,8 @@ private:
 	void Free();
 
 	cudaStream_t st_ = nullptr;
+	cudaEvent_t done_ = nullptr;
+	char* host_block_ = nullptr;
 	char* block_ = nullptr;                      // one allocation for all buffers
 	size_t cap_pixels_ = 0;
 	size_t cap_hist_bytes_ = 0;

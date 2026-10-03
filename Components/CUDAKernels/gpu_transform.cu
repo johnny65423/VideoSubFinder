@@ -15,6 +15,7 @@
 #include <condition_variable>
 #include <memory>
 #include <mutex>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -158,13 +159,22 @@ Status Run(const Input& in, const Output& out)
 	const size_t n = (size_t)in.w * in.h;
 	cudaStream_t st = c.Stream();
 
-	e = cudaMemcpyAsync(c.bgr, in.bgr, n * 3, cudaMemcpyHostToDevice, st);
+	// the images go through page locked buffers: real DMA transfers, and the thread sleeps (blocking event) while the device works
+	memcpy(c.host_in, in.bgr, n * 3);
+	e = cudaMemcpyAsync(c.bgr, c.host_in, n * 3, cudaMemcpyHostToDevice, st);
 	if (e == cudaSuccess) e = c.Transform(in.N, in.LB, in.LE, in.mthr, in.mnthr);
-	if (e == cudaSuccess) e = cudaMemcpyAsync(out.ImFF, c.ff, n, cudaMemcpyDeviceToHost, st);
-	if (e == cudaSuccess) e = cudaMemcpyAsync(out.ImNE, c.ne, n, cudaMemcpyDeviceToHost, st);
-	if (e == cudaSuccess) e = cudaMemcpyAsync(out.ImY, c.y, n, cudaMemcpyDeviceToHost, st);
-	cudaError_t s = cudaStreamSynchronize(st);
-	if (e == cudaSuccess) e = s;
+	if (e == cudaSuccess) e = cudaMemcpyAsync(c.host_out, c.ff, n, cudaMemcpyDeviceToHost, st);
+	if (e == cudaSuccess) e = cudaMemcpyAsync(c.host_out + n, c.ne, n, cudaMemcpyDeviceToHost, st);
+	if (e == cudaSuccess) e = cudaMemcpyAsync(c.host_out + 2 * n, c.y, n, cudaMemcpyDeviceToHost, st);
+	if (e == cudaSuccess) e = c.RecordDone();
+	if (e == cudaSuccess) e = c.WaitDone();
+	if (e == cudaSuccess)
+	{
+		// nothing is written to the caller before the whole step succeeded
+		memcpy(out.ImFF, c.host_out, n);
+		memcpy(out.ImNE, c.host_out + n, n);
+		memcpy(out.ImY, c.host_out + 2 * n, n);
+	}
 	if (e != cudaSuccess)
 	{
 		Release(ctx, true);   // the next call starts with fresh resources

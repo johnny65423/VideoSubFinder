@@ -15,6 +15,7 @@ void Context::InjectAllocationFailure(bool on) { g_inject_allocation_failure = o
 Context::~Context()
 {
 	Free();
+	if (done_) cudaEventDestroy(done_);
 	if (st_) cudaStreamDestroy(st_);
 }
 
@@ -26,6 +27,8 @@ void Context::Free()
 		cudaFree(block_);
 	}
 	block_ = nullptr;
+	if (host_block_) cudaFreeHost(host_block_);
+	host_block_ = nullptr; host_in = nullptr; host_out = nullptr;
 	cap_pixels_ = 0; cap_hist_bytes_ = 0;
 	bgr = y = u = v = gy = gu = gv = orband = ff = ne = he = nullptr;
 	moeY = moeU = moeV = noeY = noeU = noeV = r1 = r2 = cm[0] = cm[1] = ess = ecp = nullptr;
@@ -34,9 +37,15 @@ void Context::Free()
 
 cudaError_t Context::Init()
 {
-	if (st_) return cudaSuccess;
-	return cudaStreamCreateWithFlags(&st_, cudaStreamNonBlocking);
+	if (st_ && done_) return cudaSuccess;
+	cudaError_t e = cudaSuccess;
+	if (!st_) e = cudaStreamCreateWithFlags(&st_, cudaStreamNonBlocking);
+	if (e == cudaSuccess && !done_) e = cudaEventCreateWithFlags(&done_, cudaEventDisableTiming | cudaEventBlockingSync);
+	return e;
 }
+
+cudaError_t Context::RecordDone() { return cudaEventRecord(done_, st_); }
+cudaError_t Context::WaitDone() { return cudaEventSynchronize(done_); }
 
 cudaError_t Context::Reserve(int w, int h)
 {
@@ -61,6 +70,15 @@ cudaError_t Context::Reserve(int w, int h)
 	char* p = nullptr;
 	cudaError_t e = cudaMalloc((void**)&p, total);
 	if (e != cudaSuccess) return e;
+	e = cudaHostAlloc((void**)&host_block_, n * 6, cudaHostAllocDefault);
+	if (e != cudaSuccess)
+	{
+		host_block_ = nullptr;
+		cudaFree(p);
+		return e;
+	}
+	host_in = (uint8_t*)host_block_;
+	host_out = host_in + n * 3;
 	block_ = p;
 	cap_pixels_ = n; cap_hist_bytes_ = hist_bytes;
 	w_ = w; h_ = h;
