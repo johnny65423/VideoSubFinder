@@ -202,10 +202,14 @@ void CScrollBar::OnLButtonDown( wxMouseEvent& event )
 
 void CScrollBar::OnLButtonUp( wxMouseEvent& event )
 {
-	if ( m_ld )	
+	if ( m_ld )
 	{
 		m_ld = false;
-		this->ReleaseMouse();		
+		this->ReleaseMouse();
+
+		wxScrollEvent scroll_event(wxEVT_SCROLL_THUMBRELEASE, 0, m_pos, 0);
+		wxEvtHandler *handler = m_pParent->GetEventHandler();
+		handler->ProcessEvent(scroll_event);
 	}
 }
 

@@ -49,7 +49,8 @@ public:
 	void OnLeftDown(wxMouseEvent& event);
 	//void OnKeyUp(wxKeyEvent& event);
 	bool CheckFilterImage();
-	void DrawImage(simple_buffer<u8>& ImBGR, const int w, const int h);	
+	void DrawImage(simple_buffer<u8>& ImBGR, const int w, const int h);
+	void ExcludeSeparatingLines(wxDC& dc);
 
 private:
    DECLARE_EVENT_TABLE()
@@ -76,9 +77,12 @@ public:
 	void Refresh(bool eraseBackground = true,
 		const wxRect* rect = (const wxRect*)NULL);
 
+	// size of the opened video, (0, 0) if there is none
+	wxSize GetVideoSize();
+
 public:
 	void OnSize(wxSizeEvent& event);
-	void OnPaint(wxPaintEvent &event);	
+	void OnPaint(wxPaintEvent &event);
 
 private:
    DECLARE_EVENT_TABLE()
@@ -133,10 +137,15 @@ public:
 	void OnKeyUp(wxKeyEvent& event);
 	void OnMouseWheel(wxMouseEvent& event);
 	void OnHScroll(wxScrollEvent& event);
+	void OnHScrollRelease(wxScrollEvent& event);
 	void OnTimer(wxTimerEvent& event);
 	void OnRButtonDown(wxMouseEvent& event);
 
 private:
+	bool m_need_exact_seek = false; // the last seek made while dragging the scroll bar was only a keyframe preview
+	bool m_drag_seek_scheduled = false; // a seek for the last dragged position is waiting in the event queue
+	s64 m_drag_seek_pos = 0;
+	void DoDragSeek();
 	std::mutex m_view_mutex;
 
 	DECLARE_EVENT_TABLE()

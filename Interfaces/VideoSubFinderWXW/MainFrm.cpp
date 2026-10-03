@@ -989,8 +989,12 @@ void CMainFrame::OnFileOpenVideo(int type)
 
 	rVB = m_pVideoBox->GetRect();
 
-	m_pVideoBox->m_pVBox->m_pVideoWnd->GetClientSize(&w, &h);
-	rcVW.x = rcVW.y = 0; 
+	// the video window keeps the aspect ratio of the video inside of m_pVBox (9 pixels border on each side),
+	// so use the whole room available for it, not the size it has at the moment
+	m_pVideoBox->m_pVBox->GetClientSize(&w, &h);
+	w -= 18;
+	h -= 18;
+	rcVW.x = rcVW.y = 0;
 	rcVW.width = w;
 	rcVW.height = h;
 	
@@ -1009,6 +1013,7 @@ void CMainFrame::OnFileOpenVideo(int type)
 	int x = ((rc.width/2-(w+dw))*3)/4, y = 5;
 	m_pVideoBox->SetSize(x, y, (w+dw+10), (h+dh+10));
 	m_pVideoBox->SetSize(x, y, (w+dw), (h+dh));
+	m_pVideoBox->UpdateSize(); // the video window must get the aspect ratio of the opened video even if the box size was not changed
 
 	m_pImageBox->m_pIW->GetClientSize(&w, &h);
 	rcIW.x = rcIW.y = 0;
@@ -2084,7 +2089,11 @@ void CMainFrame::OnTimer(wxTimerEvent& event)
 		}
 	}
 
-	m_pVideoBox->m_pSB->SetScrollPos((int)Cur);
+	// do not move the thumb back while the user is dragging it
+	if (!m_pVideoBox->m_pSB->m_ld)
+	{
+		m_pVideoBox->m_pSB->SetScrollPos((int)Cur);
+	}
 }
 
 wxString VideoTimeToStr2(s64 pos)

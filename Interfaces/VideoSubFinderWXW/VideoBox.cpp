@@ -34,6 +34,34 @@ CVideoWnd::~CVideoWnd()
 {
 }
 
+// The separating lines are transparent sibling windows lying over this window. Windows does not clip the painting
+// of a window by its transparent siblings, so every repaint of the video (playback, seeking) used to cover the lines
+// until they were repainted. Paint around the lines instead.
+void CVideoWnd::ExcludeSeparatingLines(wxDC& dc)
+{
+	if ((m_pVW == NULL) || (GetParent() != m_pVW))
+	{
+		return;
+	}
+
+	wxSize cl_size = GetClientSize();
+	wxRegion region(0, 0, cl_size.x, cl_size.y);
+	CSeparatingLine* lines[4] = { m_pVW->m_pHSL1, m_pVW->m_pHSL2, m_pVW->m_pVSL1, m_pVW->m_pVSL2 };
+
+	for (int i = 0; i < 4; i++)
+	{
+		if (lines[i] && lines[i]->IsShown())
+		{
+			wxRegion line_region(lines[i]->m_rgn);
+			wxPoint offset = lines[i]->GetPosition() - GetPosition();
+			line_region.Offset(offset.x, offset.y);
+			region.Subtract(line_region);
+		}
+	}
+
+	dc.SetDeviceClippingRegion(region);
+}
+
 void CVideoWnd::OnEraseBackGround(wxEraseEvent& event)
 {
 	bool do_erase = true;
@@ -279,6 +307,7 @@ inline void FilterImage(simple_buffer<u8> &ImBGR, simple_buffer<u8> &ImLab, cons
 void CVideoWnd::DrawImage(simple_buffer<u8>& ImBGR, const int w, const int h)
 {
 	wxPaintDC dc(this);
+	ExcludeSeparatingLines(dc);
 	{
 		int num_pixels = w * h;
 		u8* img_data = (unsigned char*)malloc(num_pixels * 3); // auto released by wxImage
@@ -362,6 +391,7 @@ void CVideoWnd::OnPaint(wxPaintEvent& WXUNUSED(event))
 			{
 				m_filter_image = false;
 				wxPaintDC dc(this);
+				ExcludeSeparatingLines(dc);
 				int cw, ch;
 				this->GetClientSize(&cw, &ch);
 				m_pVB->m_pMF->m_pVideo->SetVideoWindowPosition(0, 0, cw, ch, &dc);
@@ -402,6 +432,7 @@ void CVideoWnd::OnPaint(wxPaintEvent& WXUNUSED(event))
 			{
 				m_filter_image = false;
 				wxPaintDC dc(this);
+				ExcludeSeparatingLines(dc);
 				int cw, ch;
 				this->GetClientSize(&cw, &ch);
 				dc.DrawBitmap(m_pVB->m_pImage->Scale(cw, ch), 0, 0);
@@ -537,17 +568,45 @@ void CVideoWindow::OnPaint( wxPaintEvent &event )
 	wxPaintDC dc(this);	
 }
 
+wxSize CVideoWindow::GetVideoSize()
+{
+	if (m_pVB->m_pMF->m_VIsOpen && m_pVB->m_pMF->m_pVideo)
+	{
+		return wxSize((int)m_pVB->m_pMF->m_pVideo->m_Width, (int)m_pVB->m_pMF->m_pVideo->m_Height);
+	}
+
+	return wxSize(0, 0);
+}
+
 void CVideoWindow::OnSize(wxSizeEvent& event)
 {
 	int w, h;
 	wxRect rcCL, rcVWND;
 
 	this->GetClientSize(&w, &h);
-	
+
 	rcVWND.x = 9;
 	rcVWND.y = 9;
 	rcVWND.width = w - rcVWND.x*2;
 	rcVWND.height = h - rcVWND.y*2;
+
+	// keep the aspect ratio of the video: use the largest rectangle of this ratio that fits to the window and center it
+	wxSize video_size = GetVideoSize();
+	if ((video_size.x > 0) && (video_size.y > 0) && (rcVWND.width > 0) && (rcVWND.height > 0))
+	{
+		if ((long long)rcVWND.width * video_size.y > (long long)rcVWND.height * video_size.x)
+		{
+			int fit_w = (int)((long long)rcVWND.height * video_size.x / video_size.y);
+			rcVWND.x += (rcVWND.width - fit_w) / 2;
+			rcVWND.width = fit_w;
+		}
+		else
+		{
+			int fit_h = (int)((long long)rcVWND.width * video_size.y / video_size.x);
+			rcVWND.y += (rcVWND.height - fit_h) / 2;
+			rcVWND.height = fit_h;
+		}
+	}
 
 	m_pVideoWnd->SetSize(rcVWND);
 
@@ -590,6 +649,7 @@ BEGIN_EVENT_TABLE(CVideoBox, CResizableWindow)
 	EVT_KEY_UP(CVideoBox::OnKeyUp)
 	EVT_MOUSEWHEEL(CVideoBox::OnMouseWheel)
 	EVT_SCROLL_THUMBTRACK(CVideoBox::OnHScroll)
+	EVT_SCROLL_THUMBRELEASE(CVideoBox::OnHScrollRelease)
 	EVT_TIMER(TIMER_ID_VB, CVideoBox::OnTimer)
 	EVT_RIGHT_DOWN(CVideoBox::OnRButtonDown)
 END_EVENT_TABLE()
@@ -966,7 +1026,23 @@ void CVideoBox::OnKeyDown(wxKeyEvent& event)
 					m_pVBox->m_pVideoWnd->Reparent(m_pFullScreenWin);
 
 					wxSize cl_size = m_pFullScreenWin->GetClientSize();
-					m_pVBox->m_pVideoWnd->SetSize(0, 0, cl_size.x, cl_size.y);
+					wxRect rcFull(0, 0, cl_size.x, cl_size.y);
+					wxSize video_size = m_pVBox->GetVideoSize();
+					if ((video_size.x > 0) && (video_size.y > 0) && (cl_size.x > 0) && (cl_size.y > 0))
+					{
+						// keep the aspect ratio of the video
+						if ((long long)cl_size.x * video_size.y > (long long)cl_size.y * video_size.x)
+						{
+							rcFull.width = (int)((long long)cl_size.y * video_size.x / video_size.y);
+							rcFull.x = (cl_size.x - rcFull.width) / 2;
+						}
+						else
+						{
+							rcFull.height = (int)((long long)cl_size.x * video_size.y / video_size.x);
+							rcFull.y = (cl_size.y - rcFull.height) / 2;
+						}
+					}
+					m_pVBox->m_pVideoWnd->SetSize(rcFull);
 
 					m_pFullScreenWin->Show();
 
@@ -1247,6 +1323,35 @@ void CVideoBox::ClearScreen()
 	}
 }
 
+void CVideoBox::DoDragSeek()
+{
+	if (m_drag_seek_scheduled)
+	{
+		m_drag_seek_scheduled = false;
+
+		if (m_pMF->m_VIsOpen)
+		{
+			m_need_exact_seek = m_pMF->m_pVideo->SetPosPreview(m_drag_seek_pos);
+		}
+	}
+}
+
+void CVideoBox::OnHScrollRelease(wxScrollEvent& event)
+{
+	bool seek_is_pending = m_drag_seek_scheduled;
+	m_drag_seek_scheduled = false;
+
+	if (seek_is_pending || m_need_exact_seek)
+	{
+		m_need_exact_seek = false;
+
+		if (m_pMF->m_VIsOpen)
+		{
+			m_pMF->m_pVideo->SetPosFast(event.GetPosition());
+		}
+	}
+}
+
 void CVideoBox::OnHScroll(wxScrollEvent& event)
 {
 	s64 SP = event.GetPosition();
@@ -1266,7 +1371,16 @@ void CVideoBox::OnHScroll(wxScrollEvent& event)
 
 			if (Pos != Cur)
 			{
-				m_pMF->m_pVideo->SetPosFast(Pos);
+				// Do not seek inside of the mouse move handler: show the new scroll bar position first and
+				// seek from the event queue, only for the last dragged position.
+				// While dragging the video may show only the nearest keyframe, the exact position is set on mouse release.
+				m_drag_seek_pos = Pos;
+				if (!m_drag_seek_scheduled)
+				{
+					m_drag_seek_scheduled = true;
+					m_pSB->Update();
+					CallAfter(&CVideoBox::DoDragSeek);
+				}
 			}
 		}
 		else
