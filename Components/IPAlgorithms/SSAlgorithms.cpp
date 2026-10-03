@@ -131,47 +131,32 @@ inline int AnalizeImageForSubPresence(simple_buffer<u8> &ImNE, simple_buffer<u8>
 	return res;
 }
 
+// ImRes[i] = 0 where Im2[i] is outside of [ImRes[i] - g_max_dl_down, ImRes[i] + g_max_dl_up]  (zero stays zero).
+// Written without branches: with data dependent branches the loop is limited by branch mispredictions.
 template <class T1, class T2>
 inline void IntersectYImages(simple_buffer<T1> &ImRes, simple_buffer<T2> &Im2, int w, int h)
 {
-	int i, size;
+	const int size = w * h;
+	const int down = g_max_dl_down, up = g_max_dl_up;
+	T1* r = ImRes.m_pData;
+	const T2* p = Im2.m_pData;
 
-	size = w * h;
-	for (i = 0; i < size; i++)
+#pragma loop(ivdep)
+	for (int i = 0; i < size; i++)
 	{
-		if (ImRes[i])
-		{
-			if ((int)Im2[i]  < (int)ImRes[i] - g_max_dl_down)
-			{
-				ImRes[i] = 0;
-			}
-			else if ((int)Im2[i] > (int)ImRes[i] + g_max_dl_up)
-			{
-				ImRes[i] = 0;
-			}
-		}
+		const int v = (int)r[i];
+		const int q = (int)p[i];
+		r[i] = ((q < v - down) || (q > v + up)) ? (T1)0 : r[i];
 	}
 }
 
 template <class T1, class T2>
 inline void IntersectYImages(simple_buffer<T1>& ImRes, simple_buffer<simple_buffer<T2>*>& ImIn, int min_id_im_in, int max_id_im_in, int w, int h)
 {
-	int i, size, im_id;
-
-	size = w * h;
-	for (i = 0; i < size; i++)
-	{	
-		for (im_id = min_id_im_in; (im_id <= max_id_im_in) && ImRes[i]; im_id++)
-		{
-			if ((int)(*(ImIn[im_id]))[i] < (int)ImRes[i] - g_max_dl_down)
-			{
-				ImRes[i] = 0;
-			}
-			else if ((int)(*(ImIn[im_id]))[i] > (int)ImRes[i] + g_max_dl_up)
-			{
-				ImRes[i] = 0;
-			}
-		}
+	// once a value became 0 it stays 0, so the images can be applied one after the other
+	for (int im_id = min_id_im_in; im_id <= max_id_im_in; im_id++)
+	{
+		IntersectYImages(ImRes, *(ImIn[im_id]), w, h);
 	}
 }
 
@@ -2776,9 +2761,13 @@ void AddTwoImages(simple_buffer<T>& Im1, simple_buffer<T>& Im2, simple_buffer<T>
 
 	ImRES.copy_data(Im1, size);
 
+	T* r = ImRES.m_pData;
+	const T* p = Im2.m_pData;
+
+#pragma loop(ivdep)
 	for(i=0; i<size; i++) 
 	{
-		if (Im2[i] == 255) ImRES[i] = 255;
+		r[i] = (p[i] == 255) ? (T)255 : r[i];
 	}
 }
 
@@ -2787,9 +2776,13 @@ void AddTwoImages(simple_buffer<T>& Im1, simple_buffer<T>& Im2, int size)
 {
 	int i;
 
+	T* r = Im1.m_pData;
+	const T* p = Im2.m_pData;
+
+#pragma loop(ivdep)
 	for(i=0; i<size; i++) 
 	{
-		if (Im2[i] == 255) Im1[i] = 255;
+		r[i] = (p[i] == 255) ? (T)255 : r[i];
 	}
 }
 
