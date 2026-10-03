@@ -18,3 +18,5 @@ inline void Report(const char* name, long long cases, long long bad)
 
 // T1: every kernel against the CPU function it replaces (t1_kernels.cpp). Does nothing without USE_CUDA.
 void RunT1();
+void RunT4();   // t4_pipeline.cpp: GetTransformedImage with and without the GPU path
+void RunT7();   // t4_pipeline.cpp: threads, memory, failing allocation

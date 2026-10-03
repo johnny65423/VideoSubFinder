@@ -207,6 +207,7 @@ void CSettingsPanel::Init()
 
 #ifdef USE_CUDA
 	m_pOI->AddProperty(g_cfg.m_ssp_oi_property_use_cuda_gpu, g_cfg.m_main_labels_background_colour, g_cfg.m_main_text_ctls_background_colour, &g_use_cuda_gpu);
+	m_pOI->AddProperty(g_cfg.m_ssp_oi_property_use_cuda_gpu_transform, g_cfg.m_main_labels_background_colour, g_cfg.m_main_text_ctls_background_colour, &g_use_cuda_gpu_transform);
 #else
 	//m_pOI->AddProperty(g_cfg.m_ssp_oi_property_use_cuda_gpu + " (only on x64 is supported)", g_cfg.m_grid_debug_settings_colour, g_cfg.m_grid_debug_settings_colour, &g_use_cuda_gpu);
 	//m_pOI->SetReadOnly(m_pOI->GetNumberRows() - 1, 1, true);

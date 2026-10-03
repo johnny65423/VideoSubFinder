@@ -77,6 +77,7 @@ extern int		g_dmaxy;
 
 extern bool		g_use_ocl;
 extern bool		g_use_cuda_gpu;
+extern bool		g_use_cuda_gpu_transform;
 
 extern wxArrayString g_use_filter_color;
 extern wxArrayString g_use_outline_filter_color;

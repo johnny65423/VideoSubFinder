@@ -142,6 +142,7 @@ public:
 	wxString	m_ssp_oi_group_global_image_processing_settings;
 	wxString	m_ssp_oi_property_use_ocl;
 	wxString	m_ssp_oi_property_use_cuda_gpu;
+	wxString	m_ssp_oi_property_use_cuda_gpu_transform;
 	wxString	m_label_use_filter_color;
 	wxString	m_label_use_outline_filter_color;
 	wxString	m_label_dL_color;

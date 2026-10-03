@@ -1,11 +1,16 @@
 #include "transform_context.h"
 #include "kernels/kernels.h"
+#include <atomic>
 #include <vector>
 
 #define GT_RETURN_IF(expr) do { cudaError_t e_ = (expr); if (e_ != cudaSuccess) return e_; } while (0)
 
 namespace gpu_transform
 {
+
+static std::atomic<bool> g_inject_allocation_failure(false);
+
+void Context::InjectAllocationFailure(bool on) { g_inject_allocation_failure = on; }
 
 Context::~Context()
 {
@@ -46,6 +51,7 @@ cudaError_t Context::Reserve(int w, int h)
 
 	Free();
 	w_ = 0; h_ = 0;
+	if (g_inject_allocation_failure) return cudaErrorMemoryAllocation;
 
 	const size_t align = 256;
 	auto up = [&](size_t x) { return (x + align - 1) / align * align; };

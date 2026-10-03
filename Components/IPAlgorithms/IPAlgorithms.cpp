@@ -25,6 +25,7 @@
 #ifdef USE_CUDA
 #include "cuda_kernels.h"
 #endif
+#include "gpu_transform.h"
 
 using namespace std;
 
@@ -136,6 +137,7 @@ bool g_wxImageHandlersInitialized = false;
 bool g_use_ocl = true;
 
 bool g_use_cuda_gpu = true;
+bool g_use_cuda_gpu_transform = false;   // GPU version of the transform step of GetTransformedImage(), needs g_use_cuda_gpu as well
 
 wxArrayString g_use_filter_color;
 wxArrayString g_use_outline_filter_color;
@@ -1821,6 +1823,25 @@ int GetTransformedImage(simple_buffer<u8>& ImBGR, simple_buffer<u8>& ImFF, simpl
 
 	if (g_show_results)	SaveBGRImageWithLinesInfo(ImBGR, "/DebugImages/GetTransformedImage_01_02_ImRGBWithLinesInfo" + g_im_save_format, LB, LE, N, w, h);
 
+	// GPU version of everything between ColorFiltration() and FilterTransformedImage(): the result is the same bytes as the CPU code below,
+	// or the call reports a status other than Ok and the CPU code runs. g_show_results needs the intermediate images, so it always uses the CPU code.
+	bool gpu_done = false;
+	if (g_use_cuda_gpu && g_use_cuda_gpu_transform && !g_show_results &&
+		(ImBGR.m_size >= w * h * 3) && (ImFF.m_size >= w * h) && (ImSF.m_size >= w * h) && (ImNE.m_size >= w * h) && (ImY.m_size >= w * h))
+	{
+		const gpu_transform::Input in{ ImBGR.m_pData, w, h, LB.m_pData, LE.m_pData, N, g_mthr, g_mnthr };
+		const gpu_transform::Output out{ ImFF.m_pData, ImNE.m_pData, ImY.m_pData };
+		gpu_done = (gpu_transform::Run(in, out) == gpu_transform::Status::Ok);
+
+		const std::string message = gpu_transform::TakeFirstErrorMessage();
+		if (!message.empty()) SaveToReportLog(wxString::FromUTF8(message.c_str()) + wxT("\n"));
+	}
+
+	if (gpu_done)
+	{
+		GetImFFFinalize(ImFF, ImSF, LB, LE, N, w, h);   // the last step of GetImFF(): ImSF and the alignment of LB / LE
+	}
+	else
 	{
 		simple_buffer<u8> ImHE(w * h);
 

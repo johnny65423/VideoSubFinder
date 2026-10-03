@@ -139,6 +139,15 @@ int GetImFF(const uint8_t* y, const uint8_t* u, const uint8_t* v, int w, int h, 
 	return Finish(c, e);
 }
 
+void InjectAllocationFailure(bool on) { Context::InjectAllocationFailure(on); }
+
+size_t FreeDeviceBytes()
+{
+	size_t free_bytes = 0, total = 0;
+	if (cudaMemGetInfo(&free_bytes, &total) != cudaSuccess) return 0;
+	return free_bytes;
+}
+
 int Transform(const uint8_t* bgr, int w, int h, int N, const int* LB, const int* LE, double mthr, double mnthr, uint8_t* ff, uint8_t* ne, uint8_t* y)
 {
 	Context& c = Ctx();

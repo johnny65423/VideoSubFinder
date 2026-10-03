@@ -7,6 +7,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stddef.h>
 
 namespace gpu_transform
 {
@@ -35,6 +36,10 @@ int GetImCMOE(int variant, const uint16_t* moeY, const uint16_t* moeU, const uin
 
 // GetImFF up to its last step: ff is ImFF before GetImFFFinalize() (LB / LE are the values before the alignment). N, LB, LE must be valid bands.
 int GetImFF(const uint8_t* y, const uint8_t* u, const uint8_t* v, int w, int h, int N, const int* LB, const int* LE, double mthr, uint8_t* ff);
+
+// Fault injection and resource checks for the stress tests (T7)
+void InjectAllocationFailure(bool on);                 // while on, a thread that needs new device buffers gets cudaErrorMemoryAllocation
+size_t FreeDeviceBytes();                              // cudaMemGetInfo
 
 // The whole step from the BGR image: ImFF (before GetImFFFinalize), ImNE | ImHE and ImY
 int Transform(const uint8_t* bgr, int w, int h, int N, const int* LB, const int* LE, double mthr, double mnthr, uint8_t* ff, uint8_t* ne, uint8_t* y);

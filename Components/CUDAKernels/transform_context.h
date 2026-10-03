@@ -28,6 +28,9 @@ public:
 
 	// What ColorFiltration() guarantees about the text line bands: 1 <= N <= MAX_BANDS, ascending, not overlapping, inside [0, h - 1].
 	// The device buffers rely on it (the rows of all bands together are at most h).
+	// tests only: while set, Reserve() fails with cudaErrorMemoryAllocation whenever it would have to allocate
+	static void InjectAllocationFailure(bool on);
+
 	static bool BandsValid(int h, int N, const int* LB, const int* LE);
 
 	// ---- pipeline stages. All of them enqueue work on the stream of the context and return the first error (they never synchronize).

@@ -6,12 +6,13 @@
 //
 // Rules of this interface
 //   * No CUDA types and no wx types here, the header can be included by every project of the solution.
-//   * The call is blocking and thread safe: every calling thread gets its own device resources (stream, buffers) the first time it calls Run().
+//   * The call is blocking and thread safe: any thread may call it. The device resources (stream, buffers) come from a pool and are reused by the next call, whatever thread makes it.
 //   * The result is bit identical to the CPU code, or the call reports a status other than Ok and the caller runs the CPU code.
 //   * Without USE_CUDA the inline stubs below make every call report Status::Unavailable, no #ifdef is needed at the call sites.
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 namespace gpu_transform
 {
@@ -42,9 +43,9 @@ enum class Status
 {
 	Ok = 0,
 	Unavailable,             // built without CUDA, no CUDA device, or switched off
-	UnsupportedSize,         // the image is bigger than what the device buffers of this thread can hold and it could not be grown
+	UnsupportedSize,         // the input is something ColorFiltration() never produces (invalid text line bands, no image, absurd size)
 	OutOfMemory,             // cudaMalloc failed
-	DeviceError              // a CUDA call failed, the thread resources were reset and the device error cleared
+	DeviceError              // a CUDA call failed, the device resources of that call were discarded and the error state cleared
 };
 
 struct Stats                 // process wide counters, only for the log
@@ -54,7 +55,8 @@ struct Stats                 // process wide counters, only for the log
 	uint64_t fallbacks = 0;  // calls that returned a status other than Ok
 	uint64_t bytes_to_device = 0;
 	uint64_t bytes_from_device = 0;
-	int contexts = 0;        // number of threads that own device resources
+	int contexts = 0;        // device resource sets that exist now (the pool grows up to the number of simultaneous calls)
+	uint64_t contexts_created = 0;   // device resource sets created since the start (should stay close to the number of simultaneous calls)
 };
 
 #ifdef USE_CUDA
@@ -65,17 +67,21 @@ bool IsAvailable();
 // The step itself. Blocking, thread safe, bit identical to the CPU code when the result is Ok.
 Status Run(const Input& in, const Output& out);
 
-// Frees the device resources of the calling thread. Optional: they are also released when the thread ends.
-void ReleaseThreadResources();
+// Frees the idle device resources of the pool (e.g. after a search). Optional: the next call allocates again.
+void ReleaseResources();
 
 Stats GetStats();
+
+// The text of the first failure since the last call (empty if there was none). The caller writes it to its log; later failures are only counted in Stats.
+std::string TakeFirstErrorMessage();
 
 #else
 
 inline bool IsAvailable() { return false; }
 inline Status Run(const Input&, const Output&) { return Status::Unavailable; }
-inline void ReleaseThreadResources() {}
+inline void ReleaseResources() {}
 inline Stats GetStats() { return Stats(); }
+inline std::string TakeFirstErrorMessage() { return std::string(); }
 
 #endif
 

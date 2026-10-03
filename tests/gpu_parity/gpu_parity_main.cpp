@@ -35,7 +35,7 @@ static void test_interface_contract()
 	}
 	gpu_transform::Stats s = gpu_transform::GetStats();
 	CHECK(s.calls >= s.ok + s.fallbacks || s.calls == 0);
-	gpu_transform::ReleaseThreadResources();
+	gpu_transform::ReleaseResources();
 }
 
 // GetImFFFinalize() is the last step of GetImFF(): ImSF = copy of ImFF, LB / LE aligned to g_segh, tail of ImSF trimmed
@@ -85,6 +85,8 @@ int main(int argc, char** argv)
 	test_interface_contract();
 	test_finalize();
 	RunT1();
+	RunT4();
+	RunT7();
 
 	printf("\n%d checks, %d failed\n", g_checks, g_failed);
 	return g_failed ? 1 : 0;

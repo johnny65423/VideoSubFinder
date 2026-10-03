@@ -1327,6 +1327,7 @@ void LoadSettings()
 	ReadProperty(g_general_settings, g_show_transformed_images_only, "show_transformed_images_only");
 	ReadProperty(g_general_settings, g_use_ocl, "use_ocl");
 	ReadProperty(g_general_settings, g_use_cuda_gpu, "use_cuda_gpu");
+	ReadProperty(g_general_settings, g_use_cuda_gpu_transform, "use_cuda_gpu_transform");
 
 	ReadProperty(g_general_settings, g_use_filter_color, "use_filter_color");
 	ReadProperty(g_general_settings, g_use_outline_filter_color, "use_outline_filter_color");
@@ -1615,6 +1616,7 @@ void LoadLocaleSettings(wxString settings_path)
 	ReadProperty(g_locale_settings, g_cfg.m_label_filter_descr, "label_filter_descr");
 	ReadProperty(g_locale_settings, g_cfg.m_ssp_oi_property_use_ocl, "ssp_oi_property_use_ocl");
 	ReadProperty(g_locale_settings, g_cfg.m_ssp_oi_property_use_cuda_gpu, "ssp_oi_property_use_cuda_gpu");
+	ReadProperty(g_locale_settings, g_cfg.m_ssp_oi_property_use_cuda_gpu_transform, "ssp_oi_property_use_cuda_gpu_transform");
 
 	ReadProperty(g_locale_settings, g_cfg.m_label_use_filter_color, "label_use_filter_color");
 	ReadProperty(g_locale_settings, g_cfg.m_label_use_outline_filter_color, "label_use_outline_filter_color");
@@ -1776,6 +1778,7 @@ void SaveSettings()
 	WriteProperty(fout, g_show_transformed_images_only, "show_transformed_images_only");
 	WriteProperty(fout, g_use_ocl, "use_ocl");
 	WriteProperty(fout, g_use_cuda_gpu, "use_cuda_gpu");
+	WriteProperty(fout, g_use_cuda_gpu_transform, "use_cuda_gpu_transform");
 	
 	WriteProperty(fout, g_use_filter_color, "use_filter_color");
 	WriteProperty(fout, g_use_outline_filter_color, "use_outline_filter_color");
