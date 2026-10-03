@@ -48,7 +48,7 @@ wxString g_DefStringForEmptySub;
 
 bool g_CLEAN_RGB_IMAGES = false;
 
-int  g_ocr_threads = 8;
+int  g_ocr_threads = -1; // -1: choose automatically in CreateClearedTextImages()
 
 void GetFileNames(wxString dir_path, vector<wxString>& FileNamesVector);
 
