@@ -120,8 +120,11 @@ bool IsAvailable()
 {
 	static const bool available = []
 	{
-		int count = 0;
-		return (cudaGetDeviceCount(&count) == cudaSuccess) && (count > 0);
+		// CUDA 13 builds code for Turing (sm_75) and newer only: older devices keep using the CPU code
+		int count = 0, device = 0;
+		cudaDeviceProp prop;
+		return (cudaGetDeviceCount(&count) == cudaSuccess) && (count > 0) && (cudaGetDevice(&device) == cudaSuccess) &&
+			(cudaGetDeviceProperties(&prop, device) == cudaSuccess) && (prop.major * 10 + prop.minor >= 75);
 	}();
 	return available && g_failures_in_row < kMaxConsecutiveFailures;
 }

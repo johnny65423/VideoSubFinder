@@ -137,7 +137,7 @@ bool g_wxImageHandlersInitialized = false;
 bool g_use_ocl = true;
 
 bool g_use_cuda_gpu = true;
-bool g_use_cuda_gpu_transform = false;   // GPU version of the transform step of GetTransformedImage(), needs g_use_cuda_gpu as well
+bool g_use_cuda_gpu_transform = true;   // GPU version of the transform step of GetTransformedImage(), needs g_use_cuda_gpu as well
 
 wxArrayString g_use_filter_color;
 wxArrayString g_use_outline_filter_color;
