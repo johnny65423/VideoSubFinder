@@ -154,7 +154,7 @@ void CImageBox::OnKeyUp(wxKeyEvent& event)
 			if (m_timer.IsRunning())
 			{
 				m_timer.Stop();
-				wxTimerEvent te;
+				wxTimerEvent te(m_timer);
 				this->OnTimer(te);
 			}
 

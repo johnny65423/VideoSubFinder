@@ -1079,7 +1079,7 @@ void CMainFrame::OnFileOpenVideo(int type)
 	{
 		m_ct = -1;
 
-		wxTimerEvent event;
+		wxTimerEvent event(m_timer);
 		CMainFrame::OnTimer(event);
 		
 		m_timer.Start(100);
