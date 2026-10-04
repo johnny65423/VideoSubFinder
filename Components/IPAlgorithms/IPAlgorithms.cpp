@@ -58,6 +58,10 @@ int ClearImageOpt2(simple_buffer<u8> &Im, int w, int h, int W, int H, int LH, in
 int ClearImageOpt3(simple_buffer<u8> &Im, int w, int h, int real_im_x_center, u8 white);
 int ClearImageOpt4(simple_buffer<u8> &Im, int w, int h, int W, int H, int LH, int LMAXY, int real_im_x_center, u8 white);
 int ClearImageOpt5(simple_buffer<u8> &Im, int w, int h, int LH, int LMAXY, int real_im_x_center, u8 white);
+int ClearImageFromFarSpecks(simple_buffer<u8> &Im, int w, int h, int LH, u8 white);
+int ClearImageFromBlobs(simple_buffer<u8> &Im, int w, int h, int LH, u8 white);
+int ClearImageFromTinySpecks(simple_buffer<u8> &Im, int w, int h, int LH, u8 white);
+bool ImageLooksLikeText(simple_buffer<u8> &Im, int w, int h, int LH, u8 white);
 int ClearImageByMask(simple_buffer<u8> &Im, simple_buffer<u8> &ImMASK, int w, int h, u8 white, double thr = 0.2);
 int ClearImageOptimal(simple_buffer<u8> &Im, int w, int h, u8 white);
 void CombineFiguresRelatedToEachOther(simple_buffer<CMyClosedFigure*> &ppFigures, int &N, int min_h, wxString iter_det);
@@ -6293,6 +6297,20 @@ void FindText(FindTextRes &res, simple_buffer<u8> &ImBGR, simple_buffer<u8> &ImF
 				if (g_show_results) SaveGreyscaleImage(ImMainCluster, "/DebugImages/FindText_" + iter_det + "_21_ImMainClusterClearImageLogical" + g_im_save_format, w, h);
 			}
 
+			ClearImageFromFarSpecks(ImMainCluster, w, h, LH, (u8)255);
+			if (g_show_results) SaveGreyscaleImage(ImMainCluster, "/DebugImages/FindText_" + iter_det + "_22_ImMainClusterClearFarSpecks" + g_im_save_format, w, h);
+
+			ClearImageFromBlobs(ImMainCluster, w, h, LH, (u8)255);
+
+			if (!ImageLooksLikeText(ImMainCluster, w, h, LH, (u8)255))
+			{
+				// garbage of a textured background: there is no symbol in the main cluster, there are only blobs and specks
+				return;
+			}
+
+			ClearImageFromTinySpecks(ImMainCluster, w, h, LH, (u8)255);
+			if (g_show_results) SaveGreyscaleImage(ImMainCluster, "/DebugImages/FindText_" + iter_det + "_23_ImMainClusterClearTinySpecks" + g_im_save_format, w, h);
+
 			ImFF.copy_data(ImMainCluster, w * h);
 		}
 	}
@@ -7788,6 +7806,181 @@ int ClearImageOpt5(simple_buffer<u8> &Im, int w, int h, int LH, int LMAXY, int r
 	}*/
 
 	return N;
+}
+
+// Removes the figures that are lower than half of the letter height and
+//  - farther than two letter heights (horizontally) from every figure of letter size, or
+//  - farther than 0.6 of the letter height (horizontally) from the x range of all figures of letter size, or
+//  - farther than 0.25 of the letter height (vertically) from the y range of all figures of letter size:
+// the garbage of a textured background (gravel, leaves) which got into the main cluster. The strokes and the dots of the symbols are inside of the text line area, so they stay
+// (the margins have to be wide enough for a symbol whose strokes are all low and for the punctuation marks which are below the base line).
+// Returns the number of the left figures.
+int ClearImageFromFarSpecks(simple_buffer<u8> &Im, int w, int h, int LH, u8 white)
+{
+	custom_buffer<CMyClosedFigure> pFigures;
+	SearchClosedFigures(Im, w, h, white, pFigures);
+	const int N = pFigures.size();
+
+	if ((N == 0) || (LH <= 0)) return N;
+
+	const int min_letter_h = LH / 2;
+	std::vector<std::pair<int, int>> letters; // x ranges of the letter sized figures
+	int letters_min_x = w, letters_max_x = 0, letters_min_y = h, letters_max_y = 0;
+
+	for (int i = 0; i < N; i++)
+	{
+		if (pFigures[i].height() >= min_letter_h)
+		{
+			letters.push_back({ pFigures[i].m_minX, pFigures[i].m_maxX });
+			letters_min_x = std::min<int>(letters_min_x, pFigures[i].m_minX);
+			letters_max_x = std::max<int>(letters_max_x, pFigures[i].m_maxX);
+			letters_min_y = std::min<int>(letters_min_y, pFigures[i].m_minY);
+			letters_max_y = std::max<int>(letters_max_y, pFigures[i].m_maxY);
+		}
+	}
+
+	if (letters.empty()) return N;
+
+	const int margin_x = (LH * 3) / 5;
+	const int margin_y = LH / 4;
+	int left = N;
+
+	for (int i = 0; i < N; i++)
+	{
+		CMyClosedFigure& figure = pFigures[i];
+
+		if (figure.height() >= min_letter_h) continue;
+
+		int dist = w;
+		for (const std::pair<int, int>& letter : letters)
+		{
+			dist = std::min<int>(dist, std::max<int>(0, std::max<int>(letter.first - figure.m_maxX, figure.m_minX - letter.second)));
+		}
+
+		const int dist_x = std::max<int>(0, std::max<int>(letters_min_x - figure.m_maxX, figure.m_minX - letters_max_x));
+		const int dist_y = std::max<int>(0, std::max<int>(letters_min_y - figure.m_maxY, figure.m_minY - letters_max_y));
+
+		if ((dist > 2 * LH) || (dist_x > margin_x) || (dist_y > margin_y))
+		{
+			for (int l = 0; l < figure.m_PointsArray.m_size; l++)
+			{
+				Im[figure.m_PointsArray[l]] = 0;
+			}
+			left--;
+		}
+	}
+
+	return left;
+}
+
+// Removes the tiny figures (less than 1% of LH * LH points) which are not next to a figure of letter size (the distance is less than 0.12 of the letter height):
+// the specks of a textured background between and around the symbols. The dots and the strokes of the symbols are bigger or are next to the symbols.
+// Returns the number of the removed figures.
+int ClearImageFromTinySpecks(simple_buffer<u8> &Im, int w, int h, int LH, u8 white)
+{
+	custom_buffer<CMyClosedFigure> pFigures;
+	SearchClosedFigures(Im, w, h, white, pFigures);
+	const int N = pFigures.size();
+
+	if ((N == 0) || (LH <= 0)) return 0;
+
+	const int min_letter_h = LH / 2;
+	const int margin_near = (LH * 3) / 25;
+	const double max_tiny_points = 0.01 * (double)LH * (double)LH;
+	int removed = 0;
+
+	for (int i = 0; i < N; i++)
+	{
+		CMyClosedFigure& figure = pFigures[i];
+
+		if ((figure.height() >= min_letter_h) || ((double)figure.m_PointsArray.m_size >= max_tiny_points)) continue;
+
+		bool alone = true;
+
+		for (int j = 0; j < N; j++)
+		{
+			CMyClosedFigure& letter = pFigures[j];
+
+			if ((letter.height() >= min_letter_h) &&
+				(figure.m_minX <= letter.m_maxX + margin_near) && (figure.m_maxX + margin_near >= letter.m_minX) &&
+				(figure.m_minY <= letter.m_maxY + margin_near) && (figure.m_maxY + margin_near >= letter.m_minY))
+			{
+				alone = false;
+				break;
+			}
+		}
+
+		if (alone)
+		{
+			for (int l = 0; l < figure.m_PointsArray.m_size; l++)
+			{
+				Im[figure.m_PointsArray[l]] = 0;
+			}
+			removed++;
+		}
+	}
+
+	return removed;
+}
+
+// Removes the figures which are bigger than any symbol (more than 0.6 of LH * LH points): blobs of a textured background or smears that got into the main cluster.
+// Returns the number of the removed figures.
+int ClearImageFromBlobs(simple_buffer<u8> &Im, int w, int h, int LH, u8 white)
+{
+	custom_buffer<CMyClosedFigure> pFigures;
+	SearchClosedFigures(Im, w, h, white, pFigures);
+	const int N = pFigures.size();
+
+	if ((N == 0) || (LH <= 0)) return 0;
+
+	const double max_points = 0.6 * (double)LH * (double)LH;
+	int removed = 0;
+
+	for (int i = 0; i < N; i++)
+	{
+		CMyClosedFigure& figure = pFigures[i];
+
+		if ((double)figure.m_PointsArray.m_size > max_points)
+		{
+			for (int l = 0; l < figure.m_PointsArray.m_size; l++)
+			{
+				Im[figure.m_PointsArray[l]] = 0;
+			}
+			removed++;
+		}
+	}
+
+	return removed;
+}
+
+// Tells whether the white figures of the image can be symbols of a text line (LH - the letter height).
+// The cleared main cluster of a textured background (gravel, leaves, blurred highlights) has no symbol sized figures or they are lost among specks.
+bool ImageLooksLikeText(simple_buffer<u8> &Im, int w, int h, int LH, u8 white)
+{
+	custom_buffer<CMyClosedFigure> pFigures;
+	SearchClosedFigures(Im, w, h, white, pFigures);
+	const int N = pFigures.size();
+
+	if ((N == 0) || (LH <= 0)) return false;
+
+	int letters = 0;
+
+	for (int i = 0; i < N; i++)
+	{
+		CMyClosedFigure& figure = pFigures[i];
+
+		if ((figure.height() >= LH / 2) && (figure.width() <= (3 * LH) / 2)) letters++;
+	}
+
+	if (letters == 0) return false;
+
+	// the symbols are much lower than the line area: the main cluster is made of specks and blobs, the symbol height was got from them (a text line has more than a quarter of the area height)
+	if ((LH * 4 < h) && ((letters <= 2) || (N >= 50))) return false;
+
+	// symbol sized figures are lost among specks (a text line has at least 8 of them or they are more than 12% of all figures)
+	if ((N >= 20) && (letters < 8) && (letters * 100 < N * 12)) return false;
+
+	return true;
 }
 
 void CombineFiguresRelatedToEachOther2(simple_buffer<CMyClosedFigure*> &ppFigures, int &N)
